@@ -1,7 +1,7 @@
 scala-cassandra
 ===============
 
-Implementation of a Scala wrapper over the DataStax Java Driver for Cassandra
+Implementation of a Scala wrapper over the DataStax Java Driver for Cassandra http://allthingshadoop.com/2013/11/16/using-cassandra-from-scala/
 
 Test cases are a good entry point so lets start here https://github.com/stealthly/scala-cassandra/blob/master/src/test/scala/ScalaCassandraSpec.scala
 
@@ -12,7 +12,7 @@ Test cases are a good entry point so lets start here https://github.com/stealthl
 	   Meta.createTable()
 
 	   "Meta objects" should {
-	      "be able to store their binary state starting from a random state and then retrieving it" in {
+	      "be able to store & retrieve their binary state" in {
 
 	      	 //we use a Thrift object here for portability of the data stored
 	         val tMeta = new TMeta() 
