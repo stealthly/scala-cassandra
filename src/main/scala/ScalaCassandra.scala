@@ -23,7 +23,7 @@ import org.apache.thrift.transport.TIOStreamTransport
 import org.apache.thrift.{TSerializer, TDeserializer, TBase}
 import com.datastax.driver.core.{Cluster, Session, BoundStatement}
 import com.datastax.driver.core.exceptions.InvalidQueryException
-import kafka.utils.{Logging => SysLogging}
+import kafka.utils.{Logging => AppLogging}
 import java.nio.ByteBuffer
 import com.codahale.metrics.MetricRegistry
 import scala.collection.JavaConverters._
@@ -34,22 +34,27 @@ object Metrics {
   lazy val registry: MetricRegistry = new MetricRegistry()
 }
 
-object CQL extends SysLogging {
-	private var cluster: Cluster = null
+trait Instrument {
+   def time[T <: AnyRef](x : T, s: String) = {
+    Metrics.registry.timer(MetricRegistry.name(x.getClass.asInstanceOf[Class[T]], s)).time()
+  }  
+}
+
+object CQL extends AppLogging {
+  private var cluster: Cluster = null
 	var session: Session = null
 
-	def init(): Unit = init("localhost")
-
 	def init(hosts: String): Unit = {
-		cluster = Cluster.builder()
+	  info("init for Cassandra hosts = %s".format(hosts))
+  	cluster = Cluster.builder()
               .addContactPoints(hosts)
               .build()
 
     }
 
-    def startup(ks: String) = { 
+    def startup(ks: String, hosts: String = "localhost") = { 
     	info("** starting cassandra ring connection for keyspace = %s".format(ks))
-    	init() 
+    	init(hosts) 
     	
     	try {
           session = cluster.connect(ks) 
@@ -80,9 +85,19 @@ object CQL extends SysLogging {
 }
 
 
-trait Table {
+trait Table extends AppLogging{
 
-	var tableName = ""
+  var tableName = ""
+  var tableColumnNames = List("")
+  var tablePrimaryKey = ""
+  
+  object BlobMetric {
+    val insert = "object-inserted"
+    val update = "object-updated"
+    val select = "object-selected"
+  }
+
+  val blobColumnName = "objectStored" // column name for blob objects representing the object the table is flattened for
 
 	//They take a thrift object and return it in byte[] or ByteBuffer format
 	implicit def bytesToByteBuffer(bytes: Array[Byte]): ByteBuffer = {
@@ -112,4 +127,88 @@ trait Table {
 
 		bytes
 	}
+
+  def createTable() = {
+    CQL.session.execute(table())
+  }
+
+  def table() = {
+    CQL.table(tableName, tableColumnNames, tablePrimaryKey)
+  }  
+
+  //generic query creation for an insert 
+  def insert(columns: List[String]) = {
+    "INSERT INTO %s (%s) VALUES (%s);".format(tableName,columns.mkString(","),(columns.map(c=>"?").mkString(",")))
+  }
+
+  //most often we are going to be getting from single columne
+  def insertBound(condition: String): BoundStatement = {
+    insertBound(List(condition))
+  }
+
+  //bind an insert to a list of columns
+  def insertBound(columns: List[String]) = {
+    debug(insert(columns))
+    val boundStatement = new BoundStatement(CQL.session.prepare(insert(columns)))
+    boundStatement
+  }
+
+  //where we actually write to cassandra
+  def execute(boundStatement: BoundStatement) = {
+    CQL.session.execute(boundStatement)
+  }
+
+  //dynamicall create the "WHERE" condition of the CQL statement from a map of column/value conditions
+  def where(conditions: Map[String,String]) = {
+    conditions.mkString(" AND ")
+    " WHERE " + (conditions map {case (key, value) => key + " = " + value}).mkString(" AND ")
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  //helper functions for just serializing objects to the cassandra ring
+  //this way no object relational mapping
+  def getSavedBlob(condition: String) = {
+    get(List(blobColumnName), condition)
+  }
+
+  def getSavedBlobWithList(condition: List[String]) = {
+    getWithList(List(blobColumnName), condition)
+  }  
+
+  def getSavedBlobWithMap(condition: List[String]) = {
+    getWithList(List(blobColumnName), condition)
+  }    
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  //very generic helper function to better pull out and use the overall underlying implementation
+  def get(columns: List[String], condition: String): BoundStatement = {
+    getWithList(columns, List(condition))
+  }
+
+  //sometimes we are goin gto get it from many columns as the key
+  def getWithList(columns: List[String], conditions: List[String]): BoundStatement = {
+    getWithMap(columns, conditions.map(c => c -> "?").toMap) //we want to build up the blanks for the bound satement
+  }
+
+  //some magic happening here to obfuscate the CQL away from the code so it can do its thing
+  def getWithMap(columns: List[String], conditions: Map[String,String]): BoundStatement = { 
+    val query = "SELECT " + columns.mkString(", ") + " FROM " + tableName + where(conditions)
+    val boundStatement = new BoundStatement(CQL.session.prepare(query)) //prepare the bound statement query
+    boundStatement
+  }
+
+  val binaryDeserializer = new TDeserializer(new TBinaryProtocol.Factory())
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  //this gets the blob stored that is 
+  def getBlob(saved: TBase[_ <: org.apache.thrift.TBase[_, _], _ <: org.apache.thrift.TFieldIdEnum], boundStatement: BoundStatement) = {
+    val future = CQL.session.executeAsync(boundStatement)
+    val result = future.get(defaultFutureNum, defaultFutureUnit)
+
+    var blob: Array[Byte] = null
+    for (row <- future.getUninterruptibly().asScala) {
+      blob = getRowBytes(row,blobColumnName)
+    }
+    binaryDeserializer.deserialize(saved,blob)
+    saved
+  }  
 }

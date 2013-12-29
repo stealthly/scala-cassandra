@@ -1,5 +1,6 @@
 *.class
 *.log
+.vagrant
 
 # sbt specific
 dist/*

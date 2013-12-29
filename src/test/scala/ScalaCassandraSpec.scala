@@ -26,9 +26,9 @@ import scala.util.Random
 
 class ScalaCassandraSpec extends Specification {
 
-   CQL.init()
-   CQL.startup("MetaStore")
-   Meta.createTable()
+   CQL.startup("MetaStore","172.16.7.2")
+   val ddl = new MetaTableName()
+   ddl.createTable()
 
    "Meta objects" should {
       "be able to store their binary state starting from a random state and then retrieving it" in {
@@ -43,9 +43,11 @@ class ScalaCassandraSpec extends Specification {
          tMeta.setId(metaUUID.toString)
          tMeta.setDatum(dataum)
 
-         Meta.save(tMeta) //Saved to C*
+         val newMetaObj = new MetaTableName(metaUUID, tMeta)
+         newMetaObj.save() //Saved to C*
 
-         val someNewTMeta = Meta(metaUUID)
+         val savedMetaObj = new MetaTableName(metaUUID)
+         val someNewTMeta = savedMetaObj.get()
          someNewTMeta.getId() must_== metaUUID.toString
 
          someNewTMeta.getDatum() must_== dataum
