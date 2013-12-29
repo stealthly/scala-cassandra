@@ -15,7 +15,7 @@ Then once that is done (or if done already)
 2) vagrant up  
 3) ./sbt test  
 
-Cassandra will be running in the virtual machine on 172.16.7.2 and accesible to your host machine.
+Cassandra will be running in the virtual machine on 172.16.7.2 and is accessible from your host machine.
 
 Test cases are a good entry point so lets start here https://github.com/stealthly/scala-cassandra/blob/master/src/test/scala/ScalaCassandraSpec.scala
 
