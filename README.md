@@ -10,8 +10,8 @@ Use Vagrant to get up and running.
 
 Then once that is done (or if done already)
 
-0) git clone https://github.com/stealthly/scala-cassandra
-1) cd scala-cassandra
+0) git clone https://github.com/stealthly/scala-cassandra  
+1) cd scala-cassandra  
 2) vagrant up  
 3) ./sbt test  
 
