@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
+#!/bin/bash -x
 apt-get -y update
 apt-get install -y software-properties-common python-software-properties
 add-apt-repository -y ppa:webupd8team/java
@@ -43,4 +43,17 @@ setupDirectory /opt/apache
 setupDirectory /var/lib/cassandra
 setupDirectory /var/log/cassandra
 setupDirectory /var/lib/cassandra/saved_caches
+
+cd /tmp
+#we want to use this and NOT archive so we can keep up with releases
+#it might make sense to paramaterize this so you can use the version that is in produciton and flip it
+#for when you release new versions to regress against in your test flow
+wget http://www.apache.org/dist/cassandra/$cassandra_version/$cassandra_archive
+cd /opt/apache
+tar xfv /tmp/${cassandra_archive}
+cp /vagrant/vagrant/cassandra.yaml /opt/apache/apache-cassandra-$cassandra_version/conf
+
+#starter up!
+/opt/apache/apache-cassandra-${cassandra_version}/bin/cassandra
+
 

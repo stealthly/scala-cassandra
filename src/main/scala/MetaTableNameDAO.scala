@@ -28,17 +28,17 @@ import com.codahale.metrics.MetricRegistry
 import scala.collection.JavaConverters._
 import ly.stealth.thrift.{Meta => TMeta, Tag => TTag}
 
-case class MetaTableName(id: UUID, blob: ByteBuffer) extends Table with Instrument {
+case class MetaTableName(id: UUID, blobMeta: TMeta) extends Table with Instrument {
   def this() = this(null, null)
   def this(id: UUID) = this(id, null)
 
   tableName = "MetaTableName"
-  tableColumns = List("id uuid",blobColumnName + " blob")
+  tableColumnNames = List("id uuid",blobColumnName + " blob")
   tablePrimaryKey = "id"
 
   def bindIdAndBlob(exec:(List[String])=>BoundStatement) = {
-    val blob: ByteBuffer = savedBlob 
-    exec(List("id", blobColumnName)).bind(id,blob)
+    val blobBytes: ByteBuffer = blobMeta 
+    exec(List("id", blobColumnName)).bind(id,blobBytes)
   }
 
   //bind just the chainId to some CQL call in the DAL

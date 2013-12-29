@@ -23,7 +23,7 @@ import org.apache.thrift.transport.TIOStreamTransport
 import org.apache.thrift.{TSerializer, TDeserializer, TBase}
 import com.datastax.driver.core.{Cluster, Session, BoundStatement}
 import com.datastax.driver.core.exceptions.InvalidQueryException
-import kafka.utils.{Logging => SysLogging}
+import kafka.utils.{Logging => AppLogging}
 import java.nio.ByteBuffer
 import com.codahale.metrics.MetricRegistry
 import scala.collection.JavaConverters._
@@ -40,22 +40,21 @@ trait Instrument {
   }  
 }
 
-object CQL extends SysLogging {
-	private var cluster: Cluster = null
+object CQL extends AppLogging {
+  private var cluster: Cluster = null
 	var session: Session = null
 
-	def init(): Unit = init("localhost")
-
 	def init(hosts: String): Unit = {
-		cluster = Cluster.builder()
+	  info("init for Cassandra hosts = %s".format(hosts))
+  	cluster = Cluster.builder()
               .addContactPoints(hosts)
               .build()
 
     }
 
-    def startup(ks: String) = { 
+    def startup(ks: String, hosts: String = "localhost") = { 
     	info("** starting cassandra ring connection for keyspace = %s".format(ks))
-    	init() 
+    	init(hosts) 
     	
     	try {
           session = cluster.connect(ks) 
@@ -86,11 +85,11 @@ object CQL extends SysLogging {
 }
 
 
-trait Table {
+trait Table extends AppLogging{
 
-  var name = ""
-  var columnNames = List("")
-  var primaryKey = ""
+  var tableName = ""
+  var tableColumnNames = List("")
+  var tablePrimaryKey = ""
   
   object BlobMetric {
     val insert = "object-inserted"
@@ -134,7 +133,7 @@ trait Table {
   }
 
   def table() = {
-    CQL.table(tableName, tableColumns, tablePrimaryKey)
+    CQL.table(tableName, tableColumnNames, tablePrimaryKey)
   }  
 
   //generic query creation for an insert 
@@ -173,11 +172,11 @@ trait Table {
   }
 
   def getSavedBlobWithList(condition: List[String]) = {
-    getWithList(List(blobColumnName), List(condition))
+    getWithList(List(blobColumnName), condition)
   }  
 
   def getSavedBlobWithMap(condition: List[String]) = {
-    getWithList(List(blobColumnName), List(condition))
+    getWithList(List(blobColumnName), condition)
   }    
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   //very generic helper function to better pull out and use the overall underlying implementation
@@ -196,9 +195,12 @@ trait Table {
     val boundStatement = new BoundStatement(CQL.session.prepare(query)) //prepare the bound statement query
     boundStatement
   }
+
+  val binaryDeserializer = new TDeserializer(new TBinaryProtocol.Factory())
+
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   //this gets the blob stored that is 
-  def getBlob(stored: TBase[_ <: org.apache.thrift.TBase[_, _], _ <: org.apache.thrift.TFieldIdEnum], boundStatement: BoundStatement) = {
+  def getBlob(saved: TBase[_ <: org.apache.thrift.TBase[_, _], _ <: org.apache.thrift.TFieldIdEnum], boundStatement: BoundStatement) = {
     val future = CQL.session.executeAsync(boundStatement)
     val result = future.get(defaultFutureNum, defaultFutureUnit)
 
@@ -206,7 +208,7 @@ trait Table {
     for (row <- future.getUninterruptibly().asScala) {
       blob = getRowBytes(row,blobColumnName)
     }
-    binaryDeserializer.deserialize(stored,chainObject)
-    blob
+    binaryDeserializer.deserialize(saved,blob)
+    saved
   }  
 }
