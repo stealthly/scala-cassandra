@@ -26,7 +26,7 @@ import scala.util.Random
 
 class ScalaCassandraSpec extends Specification {
 
-   CQL.startup("MetaStore","192.168.75.10")
+   CQL.startup("MetaStore","172.16.7.2")
    val ddl = new MetaTableName()
    ddl.createTable()
 

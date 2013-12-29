@@ -25,7 +25,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     cassandra_config.vm.box = "precise64"
     cassandra_config.vm.box_url = "http://files.vagrantup.com/precise64.box"
 
-    cassandra_config.vm.network :private_network, ip: "192.168.75.10"
+    cassandra_config.vm.network :private_network, ip: "172.16.7.2"
     
     cassandra_config.vm.provider "virtualbox" do |vb|
       vb.customize ["modifyvm", :id, "--memory", "1048"]
