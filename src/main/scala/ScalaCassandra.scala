@@ -49,7 +49,7 @@ object CQL extends AppLogging {
 
 	def init(hosts: String): Unit = {
 	  info("init for Cassandra hosts = %s".format(hosts))
-  	if (clusterCreated.getAndSet(true)) { //only do this once
+  	if (!clusterCreated.getAndSet(true)) { //only do this once
           cluster = Cluster.builder()
               .addContactPoints(hosts)
               .build()
