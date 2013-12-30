@@ -28,6 +28,7 @@ import java.nio.ByteBuffer
 import com.codahale.metrics.MetricRegistry
 import scala.collection.JavaConverters._
 import ly.stealth.thrift.{Meta => TMeta, Tag => TTag}
+import java.util.concurrent.atomic._
 
 object Metrics {
 
@@ -41,16 +42,19 @@ trait Instrument {
 }
 
 object CQL extends AppLogging {
+  private val clusterCreated = new AtomicBoolean(false)
+
   private var cluster: Cluster = null
 	var session: Session = null
 
 	def init(hosts: String): Unit = {
 	  info("init for Cassandra hosts = %s".format(hosts))
-  	cluster = Cluster.builder()
+  	if (clusterCreated.getAndSet(true)) { //only do this once
+          cluster = Cluster.builder()
               .addContactPoints(hosts)
               .build()
-
     }
+  }
 
     def startup(ks: String, hosts: String = "localhost") = { 
     	info("** starting cassandra ring connection for keyspace = %s".format(ks))
