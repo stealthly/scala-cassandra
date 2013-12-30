@@ -65,7 +65,7 @@ The example implementation is contained in the https://github.com/stealthly/scal
 	    exec(List("id", blobColumnName)).bind(id,blobBytes)
 	  }
 
-	  //bind just the chainId to some CQL call in the DAL
+	  //bind just the id to some CQL call in the DAL
 	  def bindId(exec: (String)=>BoundStatement) = {
 	    exec("id").bind(id)
 	  }
