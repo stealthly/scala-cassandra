@@ -41,7 +41,7 @@ case class MetaTableName(id: UUID, blobMeta: TMeta) extends Table with Instrumen
     exec(List("id", blobColumnName)).bind(id,blobBytes)
   }
 
-  //bind just the chainId to some CQL call in the DAL
+  //bind just the id to some CQL call in the DAL
   def bindId(exec: (String)=>BoundStatement) = {
     exec("id").bind(id)
   }
