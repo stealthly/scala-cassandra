@@ -31,7 +31,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       vb.customize ["modifyvm", :id, "--memory", "1048"]
     end
 
-    cassandra_config.vm.provision "shell", path: "vagrant/install_cassandra.sh", :args => "2.0.3"
+    cassandra_config.vm.provision "shell", path: "vagrant/install_cassandra.sh", :args => "2.0.4"
   end
 
 end
