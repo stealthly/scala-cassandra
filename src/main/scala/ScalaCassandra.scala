@@ -21,7 +21,7 @@ import java.util.concurrent.{TimeUnit, TimeoutException}
 import org.apache.thrift.protocol.TBinaryProtocol
 import org.apache.thrift.transport.TIOStreamTransport
 import org.apache.thrift.{TSerializer, TDeserializer, TBase}
-import com.datastax.driver.core.{Cluster, Session, BoundStatement}
+import com.datastax.driver.core.{Cluster, Session, BoundStatement, Row}
 import com.datastax.driver.core.exceptions.InvalidQueryException
 import kafka.utils.{Logging => AppLogging}
 import java.nio.ByteBuffer
@@ -163,10 +163,12 @@ trait Table extends AppLogging{
   }
 
   //dynamicall create the "WHERE" condition of the CQL statement from a map of column/value conditions
-  def where(conditions: Map[String,String]) = {
-    conditions.mkString(" AND ")
-    " WHERE " + (conditions map {case (key, value) => key + " = " + value}).mkString(" AND ")
-  }
+
+  def where(conditions: Map[String,String], in: List[String] = List.empty) = {
+    val c = (conditions.map{case (key, value) => key + " = " + value}).mkString(" AND ")
+    val i = (in.map{i => i + " IN ?"}).mkString(" AND ")
+    " WHERE " + List(c,i).filter(s => s.size > 0).mkString(" AND ")
+  }  
 
   //////////////////////////////////////////////////////////////////////////////
   //helper functions for just serializing objects to the cassandra ring
@@ -182,6 +184,10 @@ trait Table extends AppLogging{
   def getSavedBlobWithMap(condition: List[String]) = {
     getWithList(List(blobColumnName), condition)
   }    
+
+  def getAllColumnsIn(in: List[String]) = {
+    getWithList(List("*"), List.empty[String], in)
+  }
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   //very generic helper function to better pull out and use the overall underlying implementation
   def get(columns: List[String], condition: String): BoundStatement = {
@@ -189,13 +195,14 @@ trait Table extends AppLogging{
   }
 
   //sometimes we are goin gto get it from many columns as the key
-  def getWithList(columns: List[String], conditions: List[String]): BoundStatement = {
-    getWithMap(columns, conditions.map(c => c -> "?").toMap) //we want to build up the blanks for the bound satement
+  def getWithList(columns: List[String], conditions: List[String], in: List[String] = List.empty): BoundStatement = {
+    getWithMap(columns, conditions.map(c => c -> "?").toMap, in) //we want to build up the blanks for the bound satement
   }
 
   //some magic happening here to obfuscate the CQL away from the code so it can do its thing
-  def getWithMap(columns: List[String], conditions: Map[String,String]): BoundStatement = { 
-    val query = "SELECT " + columns.mkString(", ") + " FROM " + tableName + where(conditions)
+  def getWithMap(columns: List[String], conditions: Map[String,String], in: List[String] = List.empty): BoundStatement = { 
+    val query = "SELECT " + columns.mkString(", ") + " FROM " + tableName + where(conditions, in)
+    debug(query)
     val boundStatement = new BoundStatement(CQL.session.prepare(query)) //prepare the bound statement query
     boundStatement
   }
@@ -215,4 +222,13 @@ trait Table extends AppLogging{
     binaryDeserializer.deserialize(saved,blob)
     saved
   }  
+
+  def processRows(process: (Row)=> Unit, boundStatement: BoundStatement) = {
+    val future = CQL.session.executeAsync(boundStatement)
+    val result = future.get(defaultFutureNum, defaultFutureUnit)
+
+    for (row <- future.getUninterruptibly().asScala) {
+      process(row)
+    }    
+  }
 }

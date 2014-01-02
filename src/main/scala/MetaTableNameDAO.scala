@@ -21,7 +21,7 @@ import java.util.concurrent.{TimeUnit, TimeoutException}
 import org.apache.thrift.protocol.TBinaryProtocol
 import org.apache.thrift.transport.TIOStreamTransport
 import org.apache.thrift.{TSerializer, TDeserializer, TBase}
-import com.datastax.driver.core.{Cluster, Session, BoundStatement}
+import com.datastax.driver.core.{Cluster, Session, BoundStatement, Row}
 import com.datastax.driver.core.exceptions.InvalidQueryException
 import java.nio.ByteBuffer
 import com.codahale.metrics.MetricRegistry
@@ -46,6 +46,12 @@ case class MetaTableName(id: UUID, blobMeta: TMeta) extends Table with Instrumen
     exec("id").bind(id)
   }
 
+  //bind to more than one id for a lookup
+  def bindListOfId(exec: (List[String])=>BoundStatement, listOfId: List[UUID]) = {
+    val bs = exec(List("id"))
+    bs.bind(listOfId.asJava)
+  }
+
   //save the object we have, upsert
   def save() = {
     val context = time(MetaTableName,BlobMetric.insert)
@@ -61,4 +67,8 @@ case class MetaTableName(id: UUID, blobMeta: TMeta) extends Table with Instrumen
     getBlob(new TMeta(), bindId(getSavedBlob)).asInstanceOf[TMeta]
     
   }  
+
+  def getRows(process: (Row)=> Unit, listOfId: List[UUID]) = {
+    processRows(process,bindListOfId(getAllColumnsIn,listOfId))
+  }
 }
