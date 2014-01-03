@@ -10,8 +10,9 @@ resolvers += "Apache Staging" at "https://repository.apache.org/content/groups/s
 
 libraryDependencies ++= Seq(
 	"org.specs2" %% "specs2" % "2.2.2" % "test",
-	"com.datastax.cassandra" % "cassandra-driver-core" % "1.0.3",
-	"org.apache.kafka" % "kafka_2.10" % "0.8.0",
+	"com.datastax.cassandra" % "cassandra-driver-core" % "2.0.0-rc2",
+	"org.apache.kafka" % "kafka_2.10" % "0.8.0" intransitive(),
+  "log4j" % "log4j" % "1.2.17",
 	"com.codahale.metrics" % "metrics-core" % "3.0.1" % "compile",
 	"nl.grons" %% "metrics-scala" % "3.0.3",
 	"org.apache.thrift" % "libthrift" % "0.9.1"
