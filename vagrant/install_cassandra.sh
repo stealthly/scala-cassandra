@@ -26,7 +26,7 @@ E_BADARGS=65
 
 if [ $# -ne $EXPECTED_ARGS ]
 then
-  echo "What is the Cassandra version number? e.g. 2.0.4"
+  echo "What is the Cassandra version number? e.g. 2.0.8"
   exit $E_BADARGS
 fi
 
