@@ -48,7 +48,7 @@ cd /tmp
 #we want to use this and NOT archive so we can keep up with releases
 #it might make sense to paramaterize this so you can use the version that is in produciton and flip it
 #for when you release new versions to regress against in your test flow
-wget http://www.apache.org/dist/cassandra/$cassandra_version/$cassandra_archive
+wget https://archive.apache.org/dist/cassandra/$cassandra_version/$cassandra_archive
 cd /opt/apache
 tar xfv /tmp/${cassandra_archive}
 cp /vagrant/vagrant/cassandra.yaml /opt/apache/apache-cassandra-$cassandra_version/conf
