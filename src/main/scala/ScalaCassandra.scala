@@ -21,7 +21,7 @@ import java.util.concurrent.{TimeUnit, TimeoutException}
 import org.apache.thrift.protocol.TBinaryProtocol
 import org.apache.thrift.transport.TIOStreamTransport
 import org.apache.thrift.{TSerializer, TDeserializer, TBase}
-import com.datastax.driver.core.{Cluster, Session, BoundStatement, Row}
+import com.datastax.driver.core.{Cluster, Session, BoundStatement, Row, PreparedStatement}
 import com.datastax.driver.core.exceptions.InvalidQueryException
 import kafka.utils.{Logging => AppLogging}
 import java.nio.ByteBuffer
@@ -29,6 +29,7 @@ import com.codahale.metrics.MetricRegistry
 import scala.collection.JavaConverters._
 import ly.stealth.thrift.{Meta => TMeta, Tag => TTag}
 import java.util.concurrent.atomic._
+import java.util.concurrent.ConcurrentHashMap
 
 object Metrics {
 
@@ -42,6 +43,7 @@ trait Instrument {
 }
 
 object CQL extends AppLogging {
+
   private val clusterCreated = new AtomicBoolean(false)
 
   private var cluster: Cluster = null
@@ -95,6 +97,8 @@ trait Table extends AppLogging{
   var tableColumnNames = List("")
   var tablePrimaryKey = ""
   
+  private val preparedStatements = new ConcurrentHashMap[String, PreparedStatement]()
+
   object BlobMetric {
     val insert = "object-inserted"
     val update = "object-updated"
@@ -150,10 +154,22 @@ trait Table extends AppLogging{
     insertBound(List(condition))
   }
 
+  def cachedPreparedStatement(query: String) = {
+    if (!preparedStatements.containsKey(query)) {
+      //we haven't used this query before
+      val preparedStatement = CQL.session.prepare(query)
+      preparedStatements.putIfAbsent(query,preparedStatement)
+      preparedStatement
+    } else {
+      preparedStatements.get(query)
+    }
+  }
+
   //bind an insert to a list of columns
   def insertBound(columns: List[String]) = {
-    debug(insert(columns))
-    val boundStatement = new BoundStatement(CQL.session.prepare(insert(columns)))
+    val insertWithColumns = insert(columns)
+    debug(insertWithColumns)
+    val boundStatement = new BoundStatement(cachedPreparedStatement(insertWithColumns))
     boundStatement
   }
 
